@@ -1,0 +1,5 @@
+{
+  "name": "CineMetrics AI Dashboard",
+  "description": "An interactive movie analytics dashboard powered by Gemini AI. Explore trends, ratings, and genres with real-time data generation and visualization.",
+  "requestFramePermissions": []
+}
