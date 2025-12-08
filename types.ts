@@ -1,23 +1,3 @@
-export interface Movie {
-  id: string;
-  title: string;
-  genre: string;
-  language: string;
-  year: number;
-  imdbRating: number;
-  rottenTomatoesRating: number;
-  budget: number; // in millions
-  revenue: number; // in millions
-}
-
-export interface FilterState {
-  selectedGenres: string[];
-  selectedLanguages: string[];
-  yearRange: [number, number];
-  ratingSource: 'imdb' | 'rottenTomatoes';
-  showTopRatedOnly: boolean;
-}
-
 export enum GenreType {
   All = 'All',
   Action = 'Action',
@@ -27,7 +7,7 @@ export enum GenreType {
   Horror = 'Horror',
   Romance = 'Romance',
   Thriller = 'Thriller',
-  Adventure = 'Adventure'
+  Adventure = 'Adventure',
 }
 
 export enum LanguageType {
@@ -36,5 +16,25 @@ export enum LanguageType {
   Tamil = 'Tamil',
   Telugu = 'Telugu',
   Malayalam = 'Malayalam',
-  Kannada = 'Kannada'
+  Kannada = 'Kannada',
+}
+
+export interface Movie {
+  id: string;
+  title: string;
+  genre: GenreType;        // use enum
+  language: LanguageType;  // use enum
+  year: number;
+  imdbRating: number;
+  rottenTomatoesRating: number;
+  budget: number;  // in millions
+  revenue: number; // in millions
+}
+
+export interface FilterState {
+  selectedGenres: GenreType[];       // use enum[]
+  selectedLanguages: LanguageType[]; // use enum[]
+  yearRange: [number, number];
+  ratingSource: 'imdb' | 'rottenTomatoes';
+  showTopRatedOnly: boolean;
 }

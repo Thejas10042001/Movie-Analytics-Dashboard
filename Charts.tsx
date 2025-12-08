@@ -6,11 +6,13 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
   ScatterChart,
   Scatter,
-  Rectangle,
-  Legend
+  ZAxis,
+  Cell,
+  Rectangle
 } from 'recharts';
 import { Movie, FilterState } from '../../types';
 
@@ -18,19 +20,6 @@ interface ChartProps {
   data: Movie[];
   filters: FilterState;
 }
-
-// Genre Color Palette
-const GENRE_COLORS: Record<string, string> = {
-  Action: '#EF4444',    // red-500
-  Drama: '#3B82F6',     // blue-500
-  Comedy: '#F59E0B',    // amber-500
-  'Sci-Fi': '#8B5CF6',  // violet-500
-  Horror: '#10B981',    // emerald-500
-  Romance: '#EC4899',   // pink-500
-  Thriller: '#6366F1',  // indigo-500
-  Adventure: '#14B8A6', // teal-500
-  All: '#9CA3AF'
-};
 
 const ChartCard: React.FC<{
   title: string;
@@ -47,23 +36,6 @@ const ChartCard: React.FC<{
       {action && <div className="ml-4">{action}</div>}
     </div>
     <div className="flex-1 w-full min-h-0">{children}</div>
-  </div>
-);
-
-// --- Skeleton Loader Component ---
-export const ChartSkeleton: React.FC = () => (
-  <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 shadow-lg flex flex-col h-[400px] animate-pulse">
-    <div className="mb-4 space-y-3">
-      <div className="h-6 w-48 bg-gray-700 rounded" />
-      <div className="h-4 w-32 bg-gray-700/60 rounded" />
-    </div>
-    <div className="flex-1 w-full bg-gray-700/10 rounded-lg flex items-end justify-between px-6 pb-6 gap-4 border border-gray-700/30">
-      <div className="w-full h-[40%] bg-gray-700/30 rounded-t" />
-      <div className="w-full h-[70%] bg-gray-700/30 rounded-t" />
-      <div className="w-full h-[50%] bg-gray-700/30 rounded-t" />
-      <div className="w-full h-[80%] bg-gray-700/30 rounded-t" />
-      <div className="w-full h-[60%] bg-gray-700/30 rounded-t" />
-    </div>
   </div>
 );
 
@@ -136,7 +108,7 @@ const HoverableScatterPoint = (props: any) => {
       vectorEffect="non-scaling-stroke"
       className="cursor-pointer"
       style={{
-        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', // Subtle spring effect
+        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
         transformBox: 'fill-box',
         transformOrigin: 'center',
         transform: 'scale(1)',
@@ -151,7 +123,6 @@ const HoverableScatterPoint = (props: any) => {
         node.style.strokeWidth = '2px';
         node.style.strokeOpacity = '1';
 
-        // Critical: Call the original Recharts handler to trigger tooltip
         if (onMouseEnter) onMouseEnter(e);
       }}
       onMouseLeave={(e) => {
@@ -161,7 +132,6 @@ const HoverableScatterPoint = (props: any) => {
         node.style.strokeWidth = '0px';
         node.style.strokeOpacity = '0';
 
-        // Critical: Call the original Recharts handler to hide tooltip
         if (onMouseLeave) onMouseLeave(e);
       }}
     />
@@ -185,7 +155,7 @@ export const RatingHistogram: React.FC<ChartProps> = ({ data, filters }) => {
       const rating =
         filters.ratingSource === 'imdb'
           ? m.imdbRating
-          : m.rottenTomatoesRating / 10; // normalize RT to /10
+          : m.rottenTomatoesRating / 10; // normalized
       const index = Math.min(Math.floor(rating), 9);
       if (index >= 0) {
         buckets[index].count++;
@@ -196,7 +166,7 @@ export const RatingHistogram: React.FC<ChartProps> = ({ data, filters }) => {
     // 3. Format payload with top movies
     return buckets.map((b) => ({
       ...b,
-      topMovies: b.movies.sort((a, bb) => bb.revenue - a.revenue).slice(0, 5) // Show top 5 by revenue
+      topMovies: b.movies.sort((a, b) => b.revenue - a.revenue).slice(0, 5) // Show top 5 by revenue
     }));
   }, [data, filters.ratingSource]);
 
@@ -204,7 +174,7 @@ export const RatingHistogram: React.FC<ChartProps> = ({ data, filters }) => {
     <ChartCard
       title="Rating Distribution"
       subtitle={`Based on ${
-        filters.ratingSource === 'imdb' ? 'IMDb' : 'Rotten Tomatoes (scaled /10)'
+        filters.ratingSource === 'imdb' ? 'IMDb' : 'Rotten Tomatoes (scaled)'
       } scores`}
     >
       <ResponsiveContainer width="100%" height="100%">
@@ -463,7 +433,7 @@ export const BudgetRatingScatter: React.FC<ChartProps> = ({ data, filters }) => 
       const rating =
         filters.ratingSource === 'imdb'
           ? m.imdbRating
-          : m.rottenTomatoesRating / 10; // normalize RT to /10
+          : m.rottenTomatoesRating / 10; // normalized
       return {
         x: m.budget,
         y: rating,
@@ -477,13 +447,10 @@ export const BudgetRatingScatter: React.FC<ChartProps> = ({ data, filters }) => 
   const yLabel =
     filters.ratingSource === 'imdb'
       ? 'IMDb Rating'
-      : 'RT Score (scaled /10)';
+      : 'RT Rating (scaled /10)';
 
   return (
-    <ChartCard
-      title="Budget vs. Rating Correlation"
-      subtitle="Does money buy quality?"
-    >
+    <ChartCard title="Budget vs. Rating Correlation" subtitle="Does money buy quality?">
       <ResponsiveContainer width="100%" height="100%">
         <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -534,102 +501,6 @@ export const BudgetRatingScatter: React.FC<ChartProps> = ({ data, filters }) => 
   );
 };
 
-// --- Scatter Plot: Revenue vs Budget by Genre ---
-export const RevenueBudgetScatter: React.FC<ChartProps> = ({ data }) => {
-  const series = useMemo(() => {
-    const groups: Record<string, any[]> = {};
-    data.forEach((m) => {
-      if (!groups[m.genre]) groups[m.genre] = [];
-      groups[m.genre].push({
-        x: m.budget,
-        y: m.revenue,
-        title: m.title,
-        genre: m.genre,
-        budget: m.budget,
-        revenue: m.revenue
-      });
-    });
-
-    // Sort genres alphabetically for consistent legend
-    return Object.keys(groups).sort().map((genre) => ({
-      genre,
-      data: groups[genre],
-      color: GENRE_COLORS[genre] || '#9CA3AF'
-    }));
-  }, [data]);
-
-  return (
-    <ChartCard
-      title="Revenue vs. Budget by Genre"
-      subtitle="Financial performance color-coded by genre"
-    >
-      <ResponsiveContainer width="100%" height="100%">
-        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-          <XAxis
-            type="number"
-            dataKey="x"
-            name="Budget"
-            unit="M"
-            stroke="#9CA3AF"
-            tick={{ fontSize: 12 }}
-            label={{ value: 'Budget (Millions)', position: 'insideBottom', offset: -5, fill: '#9CA3AF', fontSize: 12 }}
-          />
-          <YAxis
-            type="number"
-            dataKey="y"
-            name="Revenue"
-            unit="M"
-            stroke="#9CA3AF"
-            tick={{ fontSize: 12 }}
-            label={{ value: 'Revenue (Millions)', angle: -90, position: 'insideLeft', fill: '#9CA3AF', fontSize: 12 }}
-          />
-          <Tooltip
-            cursor={{ strokeDasharray: '3 3' }}
-            content={({ active, payload }) => {
-              if (active && payload && payload.length) {
-                const d = payload[0].payload;
-                return (
-                  <div className="bg-gray-800 border border-gray-600 p-3 rounded-lg shadow-xl text-xs z-50 relative min-w-[150px]">
-                    <p className="font-bold text-white text-sm mb-2 pb-1 border-b border-gray-700">
-                      {d.title}
-                    </p>
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Genre:</span>
-                        <span style={{ color: GENRE_COLORS[d.genre] }} className="font-semibold">{d.genre}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Budget:</span>
-                        <span className="text-gray-200">${d.budget}M</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Revenue:</span>
-                        <span className="text-emerald-400 font-semibold">${d.revenue}M</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            }}
-          />
-          <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" />
-          {series.map((s) => (
-            <Scatter
-              key={s.genre}
-              name={s.genre}
-              data={s.data}
-              fill={s.color}
-              shape={<HoverableScatterPoint />}
-            />
-          ))}
-        </ScatterChart>
-      </ResponsiveContainer>
-    </ChartCard>
-  );
-};
-
 // --- Strip Plot (Box Plot Proxy): Rating Spread per Genre ---
 export const GenreSpreadPlot: React.FC<ChartProps> = ({ data, filters }) => {
   const chartData = useMemo(() => {
@@ -637,7 +508,7 @@ export const GenreSpreadPlot: React.FC<ChartProps> = ({ data, filters }) => {
       const rating =
         filters.ratingSource === 'imdb'
           ? m.imdbRating
-          : m.rottenTomatoesRating / 10; // normalize RT to /10
+          : m.rottenTomatoesRating / 10; // normalized
       return {
         genre: m.genre,
         rating,

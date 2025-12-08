@@ -1,13 +1,22 @@
 import React from 'react';
-import { Film, LayoutDashboard, Database } from 'lucide-react';
+import { Film, Database, Share2, Download } from 'lucide-react';
+import { ShareModal } from './ShareModal';
 
 interface LayoutProps {
   children: React.ReactNode;
   onRefreshData: () => void;
+  onExportData: () => void;
   isLoading: boolean;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, onRefreshData, isLoading }) => {
+export const Layout: React.FC<LayoutProps> = ({
+  children,
+  onRefreshData,
+  onExportData,
+  isLoading,
+}) => {
+  const [isShareOpen, setIsShareOpen] = React.useState(false);
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
       <header className="sticky top-0 z-50 bg-gray-800/80 backdrop-blur-md border-b border-gray-700">
@@ -18,17 +27,40 @@ export const Layout: React.FC<LayoutProps> = ({ children, onRefreshData, isLoadi
                 <Film className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white tracking-tight">CineMetrics AI</h1>
-                <p className="text-xs text-indigo-400 font-medium">POWERED BY THEJAS AND HIS TEAMMATES</p>
+                <h1 className="text-xl font-bold text-white tracking-tight">
+                  CineMetrics AI
+                </h1>
+                <p className="text-xs text-indigo-400 font-medium">
+                  POWERED BY THEJAS AND HIS TEAMMATES
+                </p>
               </div>
             </div>
-            
-            <div className="flex items-center gap-4">
+
+            <div className="flex items-center gap-3">
+              {/* Export Button */}
+              <button
+                onClick={onExportData}
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 transition-all border border-gray-600"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Export CSV</span>
+              </button>
+
+              {/* Share Button */}
+              <button
+                onClick={() => setIsShareOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 transition-all border border-gray-600"
+              >
+                <Share2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Share</span>
+              </button>
+
+              {/* Generate Button */}
               <button
                 onClick={onRefreshData}
                 disabled={isLoading}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  isLoading 
+                  isLoading
                     ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
                     : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg hover:shadow-indigo-500/20'
                 }`}
@@ -56,9 +88,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, onRefreshData, isLoadi
 
       <footer className="bg-gray-800 border-t border-gray-700 py-6">
         <div className="max-w-7xl mx-auto px-4 text-center text-gray-400 text-sm">
-          <p>© {new Date().getFullYear()} CineMetrics AI Dashboard. Demo purposes only.</p>
+          <p>
+            © {new Date().getFullYear()} CineMetrics AI Dashboard. Demo purposes
+            only.
+          </p>
         </div>
       </footer>
+
+      <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
     </div>
   );
 };

@@ -218,7 +218,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters }) => 
               {/* Active Range Track */}
               <div
                 className="absolute h-1 bg-indigo-500 rounded z-0"
-                style={{ left: `${minPercent}%`, width: `${maxPercent - minPercent}%` }}
+                style={{
+                  left: `${minPercent}%`,
+                  width: `${maxPercent - minPercent}%`,
+                }}
               />
 
               {/* Min Slider Input */}
@@ -243,17 +246,17 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters }) => 
             </div>
           </div>
 
-          {/* Rating Source Selection */}
+          {/* Rating Source */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
-              <Star className="w-4 h-4" /> Primary Metric
+              <Star className="w-4 h-4" /> Rating Source
             </label>
             <select
               value={filters.ratingSource}
               onChange={handleSourceChange}
               className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
             >
-              <option value="imdb">IMDb Rating (0–10)</option>
+              <option value="imdb">IMDb (0–10)</option>
               <option value="rottenTomatoes">
                 Rotten Tomatoes (scaled 0–10)
               </option>
