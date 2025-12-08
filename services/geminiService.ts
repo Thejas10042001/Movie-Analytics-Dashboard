@@ -8,14 +8,14 @@ const ai = new GoogleGenAI({
 
 // Helper function to fetch movies for a specific time period
 async function fetchMoviesForPeriod(startYear: number, endYear: number): Promise<Movie[]> {
-  const count = 180; // Target ~180 per batch -> 5 batches ~900 movies
+  const count = 135; // Target ~135 per 3-year batch -> 15 batches -> ~2000 movies
 
   const prompt = `Generate a dataset of ${count} REAL, VERIFIABLE movies released between ${startYear} and ${endYear}.
 
 STRICT DATA INTEGRITY PROTOCOL:
 1. REAL TITLES ONLY: Every movie title must correspond to an actual film released in theaters or on major global streaming platforms.
    - ABSOLUTELY NO FAKE SEQUELS or placeholder names.
-   - Do not hallucinate data. If you run out of famous movies, include cult classics or regional hits.
+   - Do not hallucinate data. If you run out of famous movies, include cult classics, regional hits, or mid-budget successes.
 2. ACCURATE METRICS: Budget and Revenue figures must be historically accurate approximations in USD Millions.
 
 DISTRIBUTION for this specific period (${startYear}-${endYear}):
@@ -80,7 +80,8 @@ Return valid JSON matching the schema.`;
     }
 
     const data = JSON.parse(cleanJson) as Movie[];
-    return data;
+    // Filter to ensure year compliance
+    return data.filter(m => m.year >= startYear && m.year <= endYear);
   } catch (error) {
     console.warn(`Failed to generate batch for ${startYear}-${endYear}`, error);
     return [];
@@ -88,16 +89,19 @@ Return valid JSON matching the schema.`;
 }
 
 export const generateMovieDataset = async (): Promise<Movie[]> => {
-  const periods: [number, number][] = [
-    [1980, 1989],
-    [1990, 1999],
-    [2000, 2009],
-    [2010, 2019],
-    [2020, 2025],
-  ];
+  // Generate 3-year intervals from 1980 to 2025 to maximize data volume
+  // 1980-1982, 1983-1985, ... 
+  const periods: [number, number][] = [];
+  const startYear = 1980;
+  const endYear = 2025;
+  const step = 3; 
+
+  for (let i = startYear; i <= endYear; i += step) {
+    periods.push([i, Math.min(i + step - 1, endYear)]);
+  }
 
   try {
-    console.log("Starting parallel batch generation...");
+    console.log(`Starting parallel batch generation for ${periods.length} periods...`);
     const results = await Promise.all(
       periods.map(([start, end]) => fetchMoviesForPeriod(start, end)),
     );

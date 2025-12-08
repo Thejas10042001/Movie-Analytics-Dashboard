@@ -1,11 +1,12 @@
 import React from 'react';
-import { Film, Database, Share2, Download } from 'lucide-react';
+import { Film, Database, Share2, Download, BarChart3 } from 'lucide-react';
 import { ShareModal } from './ShareModal';
 
 interface LayoutProps {
   children: React.ReactNode;
   onRefreshData: () => void;
   onExportData: () => void;
+  onExportPowerBi: () => void;
   isLoading: boolean;
 }
 
@@ -13,6 +14,7 @@ export const Layout: React.FC<LayoutProps> = ({
   children,
   onRefreshData,
   onExportData,
+  onExportPowerBi,
   isLoading,
 }) => {
   const [isShareOpen, setIsShareOpen] = React.useState(false);
@@ -37,13 +39,23 @@ export const Layout: React.FC<LayoutProps> = ({
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Export Button */}
+              {/* Export Power BI Button */}
+              <button
+                onClick={onExportPowerBi}
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-gray-700 hover:bg-gray-600 text-yellow-400 transition-all border border-gray-600"
+                title="Export JSON for Power BI"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span className="hidden sm:inline">Power BI</span>
+              </button>
+
+              {/* Export CSV Button */}
               <button
                 onClick={onExportData}
                 className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 transition-all border border-gray-600"
               >
                 <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Export CSV</span>
+                <span className="hidden sm:inline">CSV</span>
               </button>
 
               {/* Share Button */}

@@ -135,10 +135,33 @@ const App: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  // Power BI Export Handler (JSON)
+  const handleExportPowerBi = () => {
+    if (filteredData.length === 0) {
+      alert("No data to export!");
+      return;
+    }
+
+    // JSON is much better for Power BI ingestion as it preserves data structure
+    // and handles special characters (commas/quotes in titles) natively.
+    const jsonContent = JSON.stringify(filteredData, null, 2);
+
+    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "cinemetrics_powerbi_dataset.json");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Layout
       onRefreshData={fetchData}
       onExportData={handleExportData}
+      onExportPowerBi={handleExportPowerBi}
       isLoading={loading}
     >
       <FilterBar filters={filters} setFilters={setFilters} />
