@@ -1,31 +1,23 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Movie, GenreType, LanguageType } from "../types";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.API_KEY,
-});
-
 // Helper function to fetch movies for a specific time period
-async function fetchMoviesForPeriod(startYear: number, endYear: number): Promise<Movie[]> {
-  // Target high count to ensure total > 2256
-  const count = 180; 
+async function fetchMoviesForPeriod(ai: GoogleGenAI, startYear: number, endYear: number): Promise<Movie[]> {
+  // 125 movies fits safely within the token limits
+  const count = 125; 
 
-  const prompt = `Generate a dataset of ${count} REAL, VERIFIABLE movies released between ${startYear} and ${endYear}.
+  const prompt = `List ${count} of the MOST FAMOUS and POPULAR movies released between ${startYear} and ${endYear}.
 
-STRICT DATA INTEGRITY PROTOCOL:
-1. REAL TITLES ONLY: Every movie title must correspond to an actual film.
-2. DIVERSITY IS KEY:
-   - Include major blockbusters, mid-budget hits, and critically acclaimed indie/regional films.
-   - Do not repeat the same 10 movies. Dig deep into the catalog.
-3. ACCURATE METRICS: Budget and Revenue must be historically accurate (USD Millions).
+CRITICAL INSTRUCTIONS:
+1. MAXIMIZE OUTPUT: Use the full token limit to give me exactly ${count} movies.
+2. FAMOUS MOVIES ONLY: Prioritize Top Box Office Hits, Oscar/National Award Winners, and Cult Classics.
+3. DATA INTEGRITY: Real budgets and revenue in USD Millions. No estimates for unknown films.
 
-DISTRIBUTION for this period (${startYear}-${endYear}):
-- Language Balance:
-  * 35% English (Hollywood, UK)
-  * 65% Indian Languages (Hindi, Tamil, Telugu, Malayalam, Kannada)
-- Genres: Varied mix (Action, Drama, Comedy, Sci-Fi, Horror, Romance, Thriller, Adventure).
+DISTRIBUTION:
+- 40% Global/Hollywood (The biggest hits of ${startYear}-${endYear})
+- 60% Indian Cinema (Major Blockbusters from Hindi, Tamil, Telugu, Malayalam, Kannada)
 
-Return valid JSON.`;
+Return ONLY valid JSON. No markdown formatting.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -70,50 +62,58 @@ Return valid JSON.`;
     });
 
     const rawText = response.text || "[]";
-    const startIdx = rawText.indexOf("[");
-    const endIdx = rawText.lastIndexOf("]");
-
+    
+    // Aggressive JSON cleaning
     let cleanJson = rawText;
-    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-      cleanJson = rawText.substring(startIdx, endIdx + 1);
+    const firstBracket = rawText.indexOf("[");
+    const lastBracket = rawText.lastIndexOf("]");
+    
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+      cleanJson = rawText.substring(firstBracket, lastBracket + 1);
     }
 
     const data = JSON.parse(cleanJson) as Movie[];
+    // Strict year filtering
     return data.filter(m => m.year >= startYear && m.year <= endYear);
   } catch (error) {
-    console.warn(`Failed to generate batch for ${startYear}-${endYear}`, error);
-    // Return empty array so Promise.all doesn't fail completely
+    console.warn(`Batch failed for ${startYear}-${endYear}`, error);
     return [];
   }
 }
 
 export const generateMovieDataset = async (onProgress?: (msg: string) => void): Promise<Movie[]> => {
-  // Generate 3-year intervals from 1980 to 2025
-  const periods: [number, number][] = [];
-  const startYear = 1980;
-  const endYear = 2025;
-  const step = 3; 
-
-  for (let i = startYear; i <= endYear; i += step) {
-    periods.push([i, Math.min(i + step - 1, endYear)]);
-  }
+  const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY,
+  });
 
   try {
-    if (onProgress) onProgress(`Initializing massive parallel data generation (${periods.length} streams)...`);
+    if (onProgress) onProgress("Fetching comprehensive movie dataset (Target: ~1500 Movies)...");
     
-    // ONE SHOT: Execute all requests in parallel
-    const results = await Promise.all(
-      periods.map(([s, e]) => fetchMoviesForPeriod(s, e))
-    );
+    // Execute all requests concurrently to load "fully at time"
+    const results = await Promise.all([
+      fetchMoviesForPeriod(ai, 1980, 1983),
+      fetchMoviesForPeriod(ai, 1984, 1987),
+      fetchMoviesForPeriod(ai, 1988, 1991),
+      fetchMoviesForPeriod(ai, 1992, 1995),
+      fetchMoviesForPeriod(ai, 1996, 1999),
+      fetchMoviesForPeriod(ai, 2000, 2003),
+      fetchMoviesForPeriod(ai, 2004, 2007),
+      fetchMoviesForPeriod(ai, 2008, 2011),
+      fetchMoviesForPeriod(ai, 2012, 2015),
+      fetchMoviesForPeriod(ai, 2016, 2019),
+      fetchMoviesForPeriod(ai, 2020, 2022),
+      fetchMoviesForPeriod(ai, 2023, 2025)
+    ]);
 
-    if (onProgress) onProgress("Merging, cleaning, and deduplicating data...");
+    if (onProgress) onProgress("Processing and deduplicating data...");
 
     const rawMovies = results.flat();
     const uniqueMap = new Map<string, Movie>();
     
+    // Deduplication key: Title + Year
     rawMovies.forEach((movie) => {
       if (movie && movie.title) {
-        const key = movie.title.toLowerCase().trim();
+        const key = `${movie.title.toLowerCase().trim()}|${movie.year}`;
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, movie);
         }
@@ -125,20 +125,18 @@ export const generateMovieDataset = async (onProgress?: (msg: string) => void): 
       id: (index + 1).toString(),
     }));
 
-    console.log(`Successfully generated ${finalMovies.length} unique movies.`);
+    console.log(`Generation complete. Total unique movies: ${finalMovies.length}`);
 
     if (finalMovies.length === 0) throw new Error("No data generated");
 
     return finalMovies;
   } catch (error) {
-    console.error("Failed to generate movie data:", error);
-    // Return fallback if critical failure
+    console.error("Critical error in movie generation:", error);
+    // Minimal fallback
     return [
-      { id: "1", title: "Oppenheimer", language: LanguageType.English, genre: GenreType.Drama, year: 2023, imdbRating: 8.4, rottenTomatoesRating: 93, budget: 100, revenue: 957 },
-      { id: "2", title: "RRR", language: LanguageType.Telugu, genre: GenreType.Action, year: 2022, imdbRating: 7.8, rottenTomatoesRating: 95, budget: 69, revenue: 160 },
-      { id: "3", title: "Kantara", language: LanguageType.Kannada, genre: GenreType.Thriller, year: 2022, imdbRating: 8.2, rottenTomatoesRating: 90, budget: 2, revenue: 50 },
-      { id: "4", title: "Vikram", language: LanguageType.Tamil, genre: GenreType.Action, year: 2022, imdbRating: 8.3, rottenTomatoesRating: 95, budget: 15, revenue: 60 },
-      { id: "5", title: "Manjummel Boys", language: LanguageType.Malayalam, genre: GenreType.Adventure, year: 2024, imdbRating: 8.4, rottenTomatoesRating: 95, budget: 2.5, revenue: 29 },
+      { id: "1", title: "Inception", language: LanguageType.English, genre: GenreType.SciFi, year: 2010, imdbRating: 8.8, rottenTomatoesRating: 87, budget: 160, revenue: 829 },
+      { id: "2", title: "Baahubali 2", language: LanguageType.Telugu, genre: GenreType.Action, year: 2017, imdbRating: 8.2, rottenTomatoesRating: 89, budget: 37, revenue: 278 },
+      { id: "3", title: "The Dark Knight", language: LanguageType.English, genre: GenreType.Action, year: 2008, imdbRating: 9.0, rottenTomatoesRating: 94, budget: 185, revenue: 1005 },
     ];
   }
 };
