@@ -3,13 +3,14 @@ import { Movie, GenreType, LanguageType } from "../types";
 
 // Helper function to fetch movies for a specific time period
 async function fetchMoviesForPeriod(ai: GoogleGenAI, startYear: number, endYear: number): Promise<Movie[]> {
-  // Increased count per batch since we have fewer batches now
+  // Target ~150 movies per small time chunk. 
+  // Multiplied by ~15 chunks = ~2250 movies total.
   const count = 150; 
 
   const prompt = `List ${count} of the MOST FAMOUS and POPULAR movies released between ${startYear} and ${endYear}.
 
 CRITICAL INSTRUCTIONS:
-1. MAXIMIZE OUTPUT: Use the full token limit to give me exactly ${count} movies.
+1. MAXIMIZE OUTPUT: You MUST return exactly ${count} movies. Do not stop early.
 2. FAMOUS MOVIES ONLY: Prioritize Top Box Office Hits, Oscar/National Award Winners, and Cult Classics.
 3. DATA INTEGRITY: Real budgets and revenue in USD Millions. No estimates for unknown films.
 
@@ -148,27 +149,29 @@ export const generateMovieDataset = async (onProgress?: (msg: string) => void): 
   if (!process.env.API_KEY) {
     console.error("API Key missing! Using fallback data.");
     if (onProgress) onProgress("API Key missing. Loading offline data...");
-    await new Promise(r => setTimeout(r, 1000)); // Simulate load
+    await new Promise(r => setTimeout(r, 1000));
     return FALLBACK_DATA;
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  // 4-year intervals. This creates ~12 parallel requests instead of 23.
-  // 12 requests is safer for browsers/API limits while still enabling "One Shot" loading.
-  const periods: [number, number][] = [
-    [1980, 1983], [1984, 1987], [1988, 1991], [1992, 1995],
-    [1996, 1999], [2000, 2003], [2004, 2007], [2008, 2011],
-    [2012, 2015], [2016, 2019], [2020, 2023], [2024, 2025]
-  ];
+  // DYNAMICALLY generate requests for parallel execution.
+  // We remove the hardcoded "periods" list as requested and calculate it on the fly.
+  const promises = [];
+  const startYear = 1980;
+  const endYear = 2025;
+  const step = 3; // 3-year intervals (Optimal for token limits)
 
+  if (onProgress) onProgress("Retrieving ~2200 movies in parallel... (Please wait)");
+
+  for (let y = startYear; y < endYear; y += step) {
+    const end = Math.min(y + step - 1, endYear);
+    // Push the request to the array to be fired immediately
+    promises.push(fetchMoviesForPeriod(ai, y, end));
+  }
+  
   try {
-    if (onProgress) onProgress("Retrieving ~1800 movies... (This takes about 10 seconds)");
-    
-    // ONE SHOT EXECUTION: Fire all 12 requests simultaneously.
-    // No batching loops. "All at once".
-    const promises = periods.map(([start, end]) => fetchMoviesForPeriod(ai, start, end));
-    
+    // Fire ALL requests simultaneously ("load completely at once")
     const results = await Promise.all(promises);
 
     const rawMovies = results.flat();
@@ -179,7 +182,6 @@ export const generateMovieDataset = async (onProgress?: (msg: string) => void): 
 
     const uniqueMap = new Map<string, Movie>();
     
-    // Deduplication
     rawMovies.forEach((movie) => {
       if (movie && movie.title) {
         const key = `${movie.title.toLowerCase().trim()}|${movie.year}`;
