@@ -18,14 +18,13 @@ import {
 const App: React.FC = () => {
   const [rawData, setRawData] = useState<Movie[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingMessage, setLoadingMessage] = useState<string>("Initializing AI Data Engine...");
   const [error, setError] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<FilterState>(() => ({
-    // Select all genres except "All" by default
     selectedGenres: (Object.values(GenreType) as GenreType[]).filter(
       (g) => g !== GenreType.All
     ),
-    // Select all languages by default
     selectedLanguages: Object.values(LanguageType) as LanguageType[],
     yearRange: [1980, 2025],
     ratingSource: 'imdb',
@@ -37,13 +36,19 @@ const App: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await generateMovieDataset();
+      setLoadingMessage("Connecting to Gemini AI...");
+      
+      const data = await generateMovieDataset((msg) => {
+        setLoadingMessage(msg);
+      });
+      
       setRawData(data);
     } catch (e) {
       console.error(e);
       setError('Failed to load movie data. Please try again.');
     } finally {
       setLoading(false);
+      setLoadingMessage("");
     }
   }, []);
 
@@ -82,7 +87,7 @@ const App: React.FC = () => {
             const r =
               filters.ratingSource === 'imdb'
                 ? curr.imdbRating
-                : curr.rottenTomatoesRating / 10; // keep normalized
+                : curr.rottenTomatoesRating / 10; 
             return acc + r;
           }, 0) / count
         : 0;
@@ -96,31 +101,18 @@ const App: React.FC = () => {
     return { count, avgRating, totalBudget, totalRevenue, avgBudget, avgRevenue };
   }, [filteredData, filters.ratingSource]);
 
-  // CSV Export Handler
+  // CSV Export
   const handleExportData = () => {
     if (filteredData.length === 0) {
       alert("No data to export!");
       return;
     }
-
-    const headers = [
-      "ID", "Title", "Genre", "Language", "Year",
-      "IMDb Rating", "Rotten Tomatoes Rating",
-      "Budget (Millions)", "Revenue (Millions)"
-    ];
-
+    const headers = ["ID", "Title", "Genre", "Language", "Year", "IMDb", "RT", "Budget", "Revenue"];
     const csvContent = [
       headers.join(","),
-      ...filteredData.map(movie => [
-        movie.id,
-        `"${movie.title.replace(/"/g, '""')}"`, // Escape quotes
-        movie.genre,
-        movie.language,
-        movie.year,
-        movie.imdbRating,
-        movie.rottenTomatoesRating,
-        movie.budget,
-        movie.revenue
+      ...filteredData.map(m => [
+        m.id, `"${m.title.replace(/"/g, '""')}"`, m.genre, m.language, m.year,
+        m.imdbRating, m.rottenTomatoesRating, m.budget, m.revenue
       ].join(","))
     ].join("\n");
 
@@ -135,17 +127,13 @@ const App: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Power BI Export Handler (JSON)
+  // Power BI Export
   const handleExportPowerBi = () => {
     if (filteredData.length === 0) {
       alert("No data to export!");
       return;
     }
-
-    // JSON is much better for Power BI ingestion as it preserves data structure
-    // and handles special characters (commas/quotes in titles) natively.
     const jsonContent = JSON.stringify(filteredData, null, 2);
-
     const blob = new Blob([jsonContent], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -166,10 +154,17 @@ const App: React.FC = () => {
     >
       <FilterBar filters={filters} setFilters={setFilters} />
 
-      {/* Optional error banner */}
       {error && (
         <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           {error}
+        </div>
+      )}
+
+      {/* Loading Overlay or Message */}
+      {loading && (
+        <div className="mb-6 p-4 bg-indigo-900/30 border border-indigo-500/30 rounded-xl flex items-center justify-center gap-3 animate-pulse">
+          <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-indigo-200 font-medium font-mono">{loadingMessage}</span>
         </div>
       )}
 
@@ -179,46 +174,31 @@ const App: React.FC = () => {
           <p className="text-sm font-medium uppercase text-gray-400">Movies Found</p>
           <p className="text-3xl font-bold text-white">{stats.count}</p>
         </div>
-
         <div className="rounded-xl border border-gray-700 bg-gray-800 p-4 shadow-md">
           <p className="text-sm font-medium uppercase text-gray-400">Avg Rating</p>
           <div className="flex items-end gap-2">
-            <p className="text-3xl font-bold text-indigo-400">
-              {stats.avgRating.toFixed(1)}
-            </p>
+            <p className="text-3xl font-bold text-indigo-400">{stats.avgRating.toFixed(1)}</p>
             <p className="mb-1 text-sm text-gray-500">/ 10</p>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
-            Source: {filters.ratingSource === 'imdb' ? 'IMDb' : 'Rotten Tomatoes (scaled)'}
-          </p>
         </div>
-
         <div className="rounded-xl border border-gray-700 bg-gray-800 p-4 shadow-md">
           <p className="text-sm font-medium uppercase text-gray-400">Avg Budget</p>
-          <p className="text-3xl font-bold text-pink-400">
-            ${stats.avgBudget.toFixed(1)}M
-          </p>
+          <p className="text-3xl font-bold text-pink-400">${stats.avgBudget.toFixed(1)}M</p>
         </div>
-
         <div className="rounded-xl border border-gray-700 bg-gray-800 p-4 shadow-md">
           <p className="text-sm font-medium uppercase text-gray-400">Avg Revenue</p>
-          <p className="text-3xl font-bold text-emerald-400">
-            ${stats.avgRevenue.toFixed(1)}M
-          </p>
+          <p className="text-3xl font-bold text-emerald-400">${stats.avgRevenue.toFixed(1)}M</p>
         </div>
-
         <div className="rounded-xl border border-gray-700 bg-gray-800 p-4 shadow-md">
           <p className="text-sm font-medium uppercase text-gray-400">Total Revenue</p>
-          <p className="text-3xl font-bold text-emerald-500">
-            ${(stats.totalRevenue / 1000).toFixed(2)}B
-          </p>
+          <p className="text-3xl font-bold text-emerald-500">${(stats.totalRevenue / 1000).toFixed(2)}B</p>
         </div>
       </div>
 
-      {/* Main Charts Grid */}
+      {/* Charts */}
       {loading ? (
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          {Array.from({ length: 7 }).map((_, i) => (
+          {Array.from({ length: 6 }).map((_, i) => (
             <ChartSkeleton key={i} />
           ))}
           <div className="lg:col-span-2">
@@ -227,9 +207,7 @@ const App: React.FC = () => {
         </div>
       ) : filteredData.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-700 bg-gray-800/50 py-20 text-center">
-          <p className="text-lg text-gray-400">
-            No movies match your filters. Try adjusting the range, language, or genre.
-          </p>
+          <p className="text-lg text-gray-400">No movies match your filters.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -239,11 +217,9 @@ const App: React.FC = () => {
           <GenreSpreadPlot data={filteredData} filters={filters} />
           <RevenueByGenreScatter data={filteredData} filters={filters} />
           <AvgRevenueByGenreBarChart data={filteredData} filters={filters} />
-          
           <div className="lg:col-span-2">
             <RevenueBudgetScatter data={filteredData} filters={filters} />
           </div>
-
           <div className="lg:col-span-2">
             <MoviesPerYearChart data={filteredData} filters={filters} />
           </div>
