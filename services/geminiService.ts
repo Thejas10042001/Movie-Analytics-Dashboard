@@ -3,8 +3,8 @@ import { Movie, GenreType, LanguageType } from "../types";
 
 // Helper function to fetch movies for a specific time period
 async function fetchMoviesForPeriod(ai: GoogleGenAI, startYear: number, endYear: number): Promise<Movie[]> {
-  // 125 movies fits safely within the token limits
-  const count = 125; 
+  // Reduced to 100 per batch to safely fit in token limits since we are making more requests now
+  const count = 100; 
 
   const prompt = `List ${count} of the MOST FAMOUS and POPULAR movies released between ${startYear} and ${endYear}.
 
@@ -154,26 +154,30 @@ export const generateMovieDataset = async (onProgress?: (msg: string) => void): 
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+  // 2-year intervals to maximize parallel batching and hit 2000+ movies
   const periods: [number, number][] = [
-    [1980, 1983], [1984, 1987], [1988, 1991],
-    [1992, 1995], [1996, 1999], [2000, 2003],
-    [2004, 2007], [2008, 2011], [2012, 2015],
-    [2016, 2019], [2020, 2022], [2023, 2025]
+    [1980, 1981], [1982, 1983], [1984, 1985], [1986, 1987],
+    [1988, 1989], [1990, 1991], [1992, 1993], [1994, 1995],
+    [1996, 1997], [1998, 1999], [2000, 2001], [2002, 2003],
+    [2004, 2005], [2006, 2007], [2008, 2009], [2010, 2011],
+    [2012, 2013], [2014, 2015], [2016, 2017], [2018, 2019],
+    [2020, 2021], [2022, 2023], [2024, 2025]
   ];
 
   try {
-    if (onProgress) onProgress("Initializing massive data stream...");
+    if (onProgress) onProgress("Initializing massive data stream (Target: 2000+ Movies)...");
     
     // CONCURRENCY CONTROL:
-    // We execute in batches of 4 parallel requests to prevent "429 Too Many Requests"
-    // while still keeping it relatively "one shot".
+    // Execute in batches of 4 parallel requests to be respectful of rate limits
     const BATCH_SIZE = 4;
     const allBatches: Movie[][] = [];
 
     for (let i = 0; i < periods.length; i += BATCH_SIZE) {
       const batchPeriods = periods.slice(i, i + BATCH_SIZE);
+      const currentBatchNum = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(periods.length / BATCH_SIZE);
       
-      if (onProgress) onProgress(`Fetching movies... (${Math.min(i + BATCH_SIZE, periods.length)} / ${periods.length} sectors)`);
+      if (onProgress) onProgress(`Fetching data batch ${currentBatchNum}/${totalBatches}...`);
       
       const batchPromises = batchPeriods.map(([start, end]) => 
         fetchMoviesForPeriod(ai, start, end)
@@ -183,7 +187,7 @@ export const generateMovieDataset = async (onProgress?: (msg: string) => void): 
       allBatches.push(...batchResults);
     }
 
-    if (onProgress) onProgress("Finalizing dataset...");
+    if (onProgress) onProgress("Finalizing & Deduplicating dataset...");
 
     const rawMovies = allBatches.flat();
     
@@ -196,6 +200,7 @@ export const generateMovieDataset = async (onProgress?: (msg: string) => void): 
     // Deduplication
     rawMovies.forEach((movie) => {
       if (movie && movie.title) {
+        // Simple deduplication key
         const key = `${movie.title.toLowerCase().trim()}|${movie.year}`;
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, movie);
@@ -214,7 +219,6 @@ export const generateMovieDataset = async (onProgress?: (msg: string) => void): 
   } catch (error) {
     console.error("Critical error in movie generation, reverting to fallback:", error);
     if (onProgress) onProgress("Connection failed. Loading backup dataset...");
-    // Return larger fallback data so user sees something substantial
     return FALLBACK_DATA;
   }
 };
