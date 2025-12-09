@@ -3,8 +3,8 @@ import { Movie, GenreType, LanguageType } from "../types";
 
 // Helper function to fetch movies for a specific time period
 async function fetchMoviesForPeriod(ai: GoogleGenAI, startYear: number, endYear: number): Promise<Movie[]> {
-  // Reduced to 100 per batch to safely fit in token limits since we are making more requests now
-  const count = 100; 
+  // Increased count per batch since we have fewer batches now
+  const count = 150; 
 
   const prompt = `List ${count} of the MOST FAMOUS and POPULAR movies released between ${startYear} and ${endYear}.
 
@@ -154,45 +154,27 @@ export const generateMovieDataset = async (onProgress?: (msg: string) => void): 
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  // 2-year intervals to maximize parallel batching and hit 2000+ movies
+  // 4-year intervals. This creates ~12 parallel requests instead of 23.
+  // 12 requests is safer for browsers/API limits while still enabling "One Shot" loading.
   const periods: [number, number][] = [
-    [1980, 1981], [1982, 1983], [1984, 1985], [1986, 1987],
-    [1988, 1989], [1990, 1991], [1992, 1993], [1994, 1995],
-    [1996, 1997], [1998, 1999], [2000, 2001], [2002, 2003],
-    [2004, 2005], [2006, 2007], [2008, 2009], [2010, 2011],
-    [2012, 2013], [2014, 2015], [2016, 2017], [2018, 2019],
-    [2020, 2021], [2022, 2023], [2024, 2025]
+    [1980, 1983], [1984, 1987], [1988, 1991], [1992, 1995],
+    [1996, 1999], [2000, 2003], [2004, 2007], [2008, 2011],
+    [2012, 2015], [2016, 2019], [2020, 2023], [2024, 2025]
   ];
 
   try {
-    if (onProgress) onProgress("Initializing massive data stream (Target: 2000+ Movies)...");
+    if (onProgress) onProgress("Retrieving ~1800 movies... (This takes about 10 seconds)");
     
-    // CONCURRENCY CONTROL:
-    // Execute in batches of 4 parallel requests to be respectful of rate limits
-    const BATCH_SIZE = 4;
-    const allBatches: Movie[][] = [];
+    // ONE SHOT EXECUTION: Fire all 12 requests simultaneously.
+    // No batching loops. "All at once".
+    const promises = periods.map(([start, end]) => fetchMoviesForPeriod(ai, start, end));
+    
+    const results = await Promise.all(promises);
 
-    for (let i = 0; i < periods.length; i += BATCH_SIZE) {
-      const batchPeriods = periods.slice(i, i + BATCH_SIZE);
-      const currentBatchNum = Math.floor(i / BATCH_SIZE) + 1;
-      const totalBatches = Math.ceil(periods.length / BATCH_SIZE);
-      
-      if (onProgress) onProgress(`Fetching data batch ${currentBatchNum}/${totalBatches}...`);
-      
-      const batchPromises = batchPeriods.map(([start, end]) => 
-        fetchMoviesForPeriod(ai, start, end)
-      );
-
-      const batchResults = await Promise.all(batchPromises);
-      allBatches.push(...batchResults);
-    }
-
-    if (onProgress) onProgress("Finalizing & Deduplicating dataset...");
-
-    const rawMovies = allBatches.flat();
+    const rawMovies = results.flat();
     
     if (rawMovies.length === 0) {
-      throw new Error("API returned 0 movies across all batches.");
+      throw new Error("API returned 0 movies.");
     }
 
     const uniqueMap = new Map<string, Movie>();
@@ -200,7 +182,6 @@ export const generateMovieDataset = async (onProgress?: (msg: string) => void): 
     // Deduplication
     rawMovies.forEach((movie) => {
       if (movie && movie.title) {
-        // Simple deduplication key
         const key = `${movie.title.toLowerCase().trim()}|${movie.year}`;
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, movie);
